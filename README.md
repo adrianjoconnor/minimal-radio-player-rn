@@ -1,1 +1,1 @@
-cd "/Users/adrianoconnor/WebstormProjects/minimalradioplayerrn" && npx react-native run-android
+npx react-native run-android

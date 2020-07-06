@@ -6,16 +6,6 @@ class Station {
     this.genre = genre;
     this.artwork = artwork;
   }
-
-  getData() {
-    return {
-      id: this.id,
-      url: this.url,
-      title: this.title,
-      genre: this.genre,
-      artwork: this.artwork,
-    };
-  }
 }
 
 export default Station;

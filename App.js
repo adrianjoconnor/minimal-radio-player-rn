@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   Button,
+  FlatList,
   Image,
   SafeAreaView,
   StyleSheet,
@@ -29,7 +30,14 @@ class App extends React.Component {
       newUrl: 'URL',
       newGenre: 'Genre',
       newArtwork: 'Artwork URL',
+      editTitle: 'Title',
+      editUrl: 'URL',
+      editGenre: 'Genre',
+      editArtwork: 'Artwork URL',
       addStationVisible: false,
+      editStationsVisible: false,
+      stationEditorVisible: false,
+      stationEditorIndex: 0,
       playPressed: false,
       stations: DefaultStations,
       selectedStation: 0,
@@ -92,7 +100,7 @@ class App extends React.Component {
   addStation() {
     let stations = this.state.stations;
     let newStation = new Station(
-      this.genIdFromTitle(),
+      this.genIdFromTitle(this.state.newTitle),
       this.state.newUrl,
       this.state.newTitle,
       this.state.newGenre,
@@ -103,8 +111,34 @@ class App extends React.Component {
     AsyncStorage.setItem('stations', JSON.stringify(stations));
   }
 
-  genIdFromTitle() {
-    let id = this.state.newTitle;
+  saveEditedStation() {
+    let stations = this.state.stations;
+    let newStation = new Station(
+      this.genIdFromTitle(this.state.editTitle),
+      this.state.editUrl,
+      this.state.editTitle,
+      this.state.editGenre,
+      this.state.editArtwork,
+    );
+    stations[this.state.stationEditorIndex] = newStation;
+    this.setState({stations: stations});
+    AsyncStorage.setItem('stations', JSON.stringify(stations));
+  }
+
+  editStation(stationIndex) {
+    let station = this.state.stations[stationIndex];
+    this.setState({
+      stationEditorVisible: true,
+      stationEditorIndex: stationIndex,
+      editTitle: station.title,
+      editUrl: station.url,
+      editGenre: station.genre,
+      editArtwork: station.artwork,
+    });
+  }
+
+  genIdFromTitle(title) {
+    let id = title;
     id = id.trim();
     id = id.toLowerCase();
     id = id.replace(' ', '-');
@@ -168,6 +202,13 @@ class App extends React.Component {
             source={{uri: selectedStation.artwork}}
             style={{width: 400, height: 400}}
           />
+          <Button
+            title="Edit Stations"
+            accessibilityLabel="Edit or delete stations."
+            onPress={() => {
+              this.setState({editStationsVisible: true});
+            }}
+          />
           <ReactNativeModal
             style={{backgroundColor: 'white'}}
             isVisible={this.state.addStationVisible}>
@@ -218,6 +259,85 @@ class App extends React.Component {
               />
             </View>
           </ReactNativeModal>
+
+          <ReactNativeModal
+            style={{backgroundColor: 'white'}}
+            isVisible={this.state.editStationsVisible}>
+            <View style={{flex: 1}}>
+              <Text>Edit Stations</Text>
+              <FlatList
+                data={this.state.stations}
+                renderItem={({item, index}) => (
+                  <Text onPress={() => this.editStation(index)}>
+                    {item.title}
+                  </Text>
+                )}
+              />
+              <Button
+                title="Done"
+                accessibilityLabel="Finish editing stations."
+                onPress={() => {
+                  this.setState({
+                    editStationsVisible: false,
+                  });
+                }}
+              />
+            </View>
+          </ReactNativeModal>
+
+          <ReactNativeModal
+            style={{backgroundColor: 'white'}}
+            isVisible={this.state.stationEditorVisible}>
+            <View style={{flex: 1}}>
+              <Text>{'Edit ' + this.state.editTitle}</Text>
+              <TextInput
+                style={{height: 40, borderColor: 'gray', borderWidth: 1}}
+                onChangeText={text => {
+                  this.setState({editTitle: text});
+                }}
+                value={this.state.editTitle}
+              />
+              <TextInput
+                style={{height: 40, borderColor: 'gray', borderWidth: 1}}
+                onChangeText={text => {
+                  this.setState({editUrl: text});
+                }}
+                value={this.state.editUrl}
+              />
+              <TextInput
+                style={{height: 40, borderColor: 'gray', borderWidth: 1}}
+                onChangeText={text => {
+                  this.setState({editGenre: text});
+                }}
+                value={this.state.editGenre}
+              />
+              <TextInput
+                style={{height: 40, borderColor: 'gray', borderWidth: 1}}
+                onChangeText={text => {
+                  this.setState({editArtwork: text});
+                }}
+                value={this.state.editArtwork}
+              />
+              <Button
+                title="Done"
+                accessibilityLabel="Save this station."
+                onPress={() => {
+                  this.saveEditedStation();
+                  this.setState({stationEditorVisible: false});
+                }}
+              />
+              <Button
+                title="Cancel"
+                accessibilityLabel="Cancel editing a station."
+                onPress={() => {
+                  this.setState({
+                    stationEditorVisible: false,
+                  });
+                }}
+              />
+            </View>
+          </ReactNativeModal>
+
           <Button
             title="Add Station"
             accessibilityLabel="Add a station."
@@ -238,7 +358,7 @@ class App extends React.Component {
 }
 
 const styles = StyleSheet.create({
-  body: {
+  SafeAreaView: {
     backgroundColor: Colors.black,
   },
 });

@@ -18,14 +18,23 @@ import DefaultStations from './const/default-stations';
 
 import TrackPlayer from 'react-native-track-player';
 import Station from './obj/station';
+import StationExplorer from './services/station-explorer';
+import Categories from './services/station-categories';
 
 class App extends React.Component {
   constructor(props) {
     super(props);
 
     TrackPlayer.registerEventHandler(() => {});
+    this.stationExplorer = new StationExplorer();
+
+    let defaultStationIds = [];
+    for (let defaultStation of DefaultStations) {
+      defaultStationIds.push(defaultStation.id);
+    }
 
     this.state = {
+      categoriesReady: false,
       newTitle: 'Title',
       newUrl: 'URL',
       newGenre: 'Genre',
@@ -35,13 +44,86 @@ class App extends React.Component {
       editGenre: 'Genre',
       editArtwork: 'Artwork URL',
       addStationVisible: false,
+      directoryStationSelectVisible: false,
+      advancedAddStationVisible: false,
       editStationsVisible: false,
       stationEditorVisible: false,
       stationEditorIndex: 0,
       playPressed: false,
       stations: DefaultStations,
+      stationIdsList: defaultStationIds,
       selectedStation: 0,
+      countries: [],
+      countryItems: [],
+      languages: [],
+      languageItems: [],
+      states: [],
+      stateItems: [],
+      tags: [],
+      tagItems: [],
+      directoryStations: [],
+      selectedCountryAdd: 'Select Country...',
+      selectedLanguageAdd: 'Select Country...',
+      selectedStateAdd: 'Select State...',
+      selectedTagAdd: 'Select Tag/Genre...',
+      directorySearchTerms: '',
     };
+
+    let that = this;
+    this.stationExplorer.prepCategories().then(() => {
+      that.state.countries = that.stationExplorer.getCountries();
+      that.state.countryItems = that.state.countries.map(
+        (country, curCountry) => {
+          return (
+            <Picker.Item
+              label={country.name + ' (' + country.stationcount + ')'}
+              value={curCountry}
+              key={country.name}
+            />
+          );
+        },
+      );
+      that.state.languages = that.stationExplorer.getLanguages();
+      that.state.languageItems = that.state.languages.map(
+        (language, curLanguage) => {
+          return (
+            <Picker.Item
+              label={language.name + ' (' + language.stationcount + ')'}
+              value={curLanguage}
+              key={language.name}
+            />
+          );
+        },
+      );
+      that.state.states = that.stationExplorer.getStates();
+      that.state.stateItems = that.state.states.map((language, curLanguage) => {
+        return (
+          <Picker.Item
+            label={
+              language.name +
+              ', ' +
+              language.country +
+              ' (' +
+              language.stationcount +
+              ')'
+            }
+            value={curLanguage}
+            key={language.name}
+          />
+        );
+      });
+      that.state.tags = that.stationExplorer.getTags();
+      that.state.tagItems = that.state.tags.map((tag, curTag) => {
+        return (
+          <Picker.Item
+            label={tag.name + ' (' + tag.stationcount + ')'}
+            value={curTag}
+            key={tag.name}
+          />
+        );
+      });
+      that.state.categoriesReady = true;
+    });
 
     const start = async () => {
       // Set up the player
@@ -97,7 +179,51 @@ class App extends React.Component {
     TrackPlayer.play();
   }
 
-  addStation() {
+  showStationsForAdd(category, param) {
+    switch (category) {
+      case Categories.COUNTRY:
+        this.stationExplorer
+          .getStationsInCountry(this.state.countries[param].name)
+          .then(response => this.displayDirectoryStations(response));
+        break;
+      case Categories.LANGUAGE:
+        this.stationExplorer
+          .getStationsByLanguage(this.state.languages[param].name)
+          .then(response => this.displayDirectoryStations(response));
+        break;
+      case Categories.STATE:
+        this.stationExplorer
+          .getStationsByStateInCountry(
+            this.state.states[param].name,
+            this.state.states[param].country,
+          )
+          .then(response => this.displayDirectoryStations(response));
+        break;
+      case Categories.TAG:
+        this.stationExplorer
+          .getStationsByTag(this.state.tags[param].name)
+          .then(response => this.displayDirectoryStations(response));
+        break;
+      case Categories.NAME:
+        this.stationExplorer
+          .searchStationsByName(param)
+          .then(response => this.displayDirectoryStations(response));
+        break;
+      default:
+        throw new Error(
+          'Attempted to show stations for unrecognised category - failed.',
+        );
+    }
+  }
+
+  displayDirectoryStations(directoryStations) {
+    this.setState({
+      directoryStations: directoryStations,
+      directoryStationSelectVisible: true,
+    });
+  }
+
+  addStationManual() {
     let stations = this.state.stations;
     let newStation = new Station(
       this.genIdFromTitle(this.state.newTitle),
@@ -107,7 +233,45 @@ class App extends React.Component {
       this.state.newArtwork,
     );
     stations.push(newStation);
-    this.setState({stations: stations});
+    let newIdsList = this.getStationIds(stations);
+    this.setState({
+      stations: stations,
+      stationIdsList: newIdsList,
+      newTitle: 'Title',
+      newUrl: 'URL',
+      newGenre: 'Genre',
+      newArtwork: 'Artwork URL',
+    });
+    AsyncStorage.setItem('stations', JSON.stringify(stations));
+  }
+
+  addStationDirectory(index) {
+    let stations = this.state.stations;
+    let dirStation = this.state.directoryStations[index];
+    if (this.state.stationIdsList.indexOf(dirStation.stationuuid) !== -1) {
+      return;
+    }
+    let genre = '';
+    if (dirStation.tags !== null && dirStation.tags !== '') {
+      if (dirStation.tags.indexOf(',') === -1) {
+        genre = dirStation.tags;
+      } else {
+        genre = dirStation.tags.split(',')[0];
+      }
+    }
+    let newStation = new Station(
+      dirStation.stationuuid,
+      dirStation.url_resolved,
+      dirStation.name,
+      genre,
+      dirStation.favicon,
+    );
+    stations.push(newStation);
+    let newIdsList = this.getStationIds(stations);
+    this.setState({
+      stations: stations,
+      stationIdsList: newIdsList,
+    });
     AsyncStorage.setItem('stations', JSON.stringify(stations));
   }
 
@@ -121,8 +285,17 @@ class App extends React.Component {
       this.state.editArtwork,
     );
     stations[this.state.stationEditorIndex] = newStation;
-    this.setState({stations: stations});
+    let newIdsList = this.getStationIds(stations);
+    this.setState({stations: stations, stationIdsList: newIdsList});
     AsyncStorage.setItem('stations', JSON.stringify(stations));
+  }
+
+  getStationIds(stations) {
+    let idsList = [];
+    for (let station of stations) {
+      idsList.push(station.id);
+    }
+    return idsList;
   }
 
   editStation(stationIndex) {
@@ -135,6 +308,14 @@ class App extends React.Component {
       editGenre: station.genre,
       editArtwork: station.artwork,
     });
+  }
+
+  deleteStation(stationIndex) {
+    let stations = this.state.stations;
+    stations.splice(stationIndex, 1);
+    let newIdsList = this.getStationIds(stations);
+    this.setState({stations: stations, stationIdsList: newIdsList});
+    AsyncStorage.setItem('stations', JSON.stringify(stations));
   }
 
   genIdFromTitle(title) {
@@ -209,55 +390,158 @@ class App extends React.Component {
               this.setState({editStationsVisible: true});
             }}
           />
+
           <ReactNativeModal
             style={{backgroundColor: 'white'}}
             isVisible={this.state.addStationVisible}>
-            <View style={{flex: 1}}>
-              <Text>Add Station</Text>
-              <TextInput
-                style={{height: 40, borderColor: 'gray', borderWidth: 1}}
-                onChangeText={text => {
-                  this.setState({newTitle: text});
-                }}
-                value={this.state.newTitle}
-              />
-              <TextInput
-                style={{height: 40, borderColor: 'gray', borderWidth: 1}}
-                onChangeText={text => {
-                  this.setState({newUrl: text});
-                }}
-                value={this.state.newUrl}
-              />
-              <TextInput
-                style={{height: 40, borderColor: 'gray', borderWidth: 1}}
-                onChangeText={text => {
-                  this.setState({newGenre: text});
-                }}
-                value={this.state.newGenre}
-              />
-              <TextInput
-                style={{height: 40, borderColor: 'gray', borderWidth: 1}}
-                onChangeText={text => {
-                  this.setState({newArtwork: text});
-                }}
-                value={this.state.newArtwork}
-              />
-              <Button
-                title="Add"
-                accessibilityLabel="Add this station."
-                onPress={() => {
-                  this.addStation();
-                  this.setState({addStationVisible: false});
-                }}
-              />
-              <Button
-                title="Cancel"
-                accessibilityLabel="Cancel adding a station."
-                onPress={() => {
-                  this.setState({addStationVisible: false});
-                }}
-              />
-            </View>
+            <Picker
+              selectedValue={this.state.selectedCountryAdd}
+              onValueChange={value =>
+                this.showStationsForAdd(Categories.COUNTRY, value)
+              }>
+              {this.state.countryItems}
+            </Picker>
+            <Picker
+              selectedValue={this.state.selectedLanguageAdd}
+              onValueChange={value =>
+                this.showStationsForAdd(Categories.LANGUAGE, value)
+              }>
+              {this.state.languageItems}
+            </Picker>
+            <Picker
+              selectedValue={this.state.selectedStateAdd}
+              onValueChange={value =>
+                this.showStationsForAdd(Categories.STATE, value)
+              }>
+              {this.state.stateItems}
+            </Picker>
+            <Picker
+              selectedValue={this.state.selectedLanguageAdd}
+              onValueChange={value =>
+                this.showStationsForAdd(Categories.LANGUAGE, value)
+              }>
+              {this.state.languageItems}
+            </Picker>
+            <Text>Search:</Text>
+            <TextInput
+              style={{height: 40, borderColor: 'gray', borderWidth: 1}}
+              onChangeText={text => {
+                this.setState({directorySearchTerms: text});
+              }}
+              value={this.state.directorySearchTerms}
+            />
+            <Button
+              title="Search"
+              accessibilityLabel="Search for stations"
+              onPress={() => {
+                this.showStationsForAdd(
+                  Categories.NAME,
+                  this.state.directorySearchTerms,
+                );
+              }}
+            />
+            <Button
+              title="Advanced Options/Manual"
+              accessibilityLabel="Show advanced add options"
+              onPress={() => {
+                this.setState({
+                  advancedAddStationVisible: true,
+                });
+              }}
+            />
+            <Button
+              title="Cancel"
+              accessibilityLabel="Cancel adding stations"
+              onPress={() => {
+                this.setState({
+                  addStationVisible: false,
+                });
+              }}
+            />
+
+            <ReactNativeModal
+              style={{backgroundColor: 'white'}}
+              isVisible={this.state.directoryStationSelectVisible}>
+              <View style={{flex: 1}}>
+                <Text>Press Stations to Add...</Text>
+                <FlatList
+                  data={this.state.directoryStations}
+                  renderItem={({item, index}) => (
+                    <Text
+                      onPress={() => this.addStationDirectory(index)}
+                      style={{
+                        color:
+                          this.state.stationIdsList.indexOf(item.stationuuid) >
+                          -1
+                            ? 'green'
+                            : 'red',
+                      }}>
+                      {item.name}
+                    </Text>
+                  )}
+                />
+                <Button
+                  title="Done"
+                  accessibilityLabel="Finish adding stations."
+                  onPress={() => {
+                    this.setState({
+                      directoryStationSelectVisible: false,
+                    });
+                  }}
+                />
+              </View>
+            </ReactNativeModal>
+
+            <ReactNativeModal
+              style={{backgroundColor: 'white'}}
+              isVisible={this.state.advancedAddStationVisible}>
+              <View style={{flex: 1}}>
+                <Text>Add Station</Text>
+                <TextInput
+                  style={{height: 40, borderColor: 'gray', borderWidth: 1}}
+                  onChangeText={text => {
+                    this.setState({newTitle: text});
+                  }}
+                  value={this.state.newTitle}
+                />
+                <TextInput
+                  style={{height: 40, borderColor: 'gray', borderWidth: 1}}
+                  onChangeText={text => {
+                    this.setState({newUrl: text});
+                  }}
+                  value={this.state.newUrl}
+                />
+                <TextInput
+                  style={{height: 40, borderColor: 'gray', borderWidth: 1}}
+                  onChangeText={text => {
+                    this.setState({newGenre: text});
+                  }}
+                  value={this.state.newGenre}
+                />
+                <TextInput
+                  style={{height: 40, borderColor: 'gray', borderWidth: 1}}
+                  onChangeText={text => {
+                    this.setState({newArtwork: text});
+                  }}
+                  value={this.state.newArtwork}
+                />
+                <Button
+                  title="Add"
+                  accessibilityLabel="Add this station."
+                  onPress={() => {
+                    this.addStationManual();
+                    this.setState({advancedAddStationVisible: false});
+                  }}
+                />
+                <Button
+                  title="Cancel"
+                  accessibilityLabel="Cancel adding a station."
+                  onPress={() => {
+                    this.setState({advancedAddStationVisible: false});
+                  }}
+                />
+              </View>
+            </ReactNativeModal>
           </ReactNativeModal>
 
           <ReactNativeModal
@@ -335,6 +619,16 @@ class App extends React.Component {
                   });
                 }}
               />
+              <Button
+                title="Delete"
+                accessibilityLabel="Delete a station."
+                onPress={() => {
+                  this.deleteStation(this.state.stationEditorIndex);
+                  this.setState({
+                    stationEditorVisible: false,
+                  });
+                }}
+              />
             </View>
           </ReactNativeModal>
 
@@ -344,6 +638,7 @@ class App extends React.Component {
             onPress={() => {
               this.setState({
                 addStationVisible: true,
+                advancedAddStationVisible: false,
                 newTitle: 'Title',
                 newUrl: 'Url',
                 newGenre: 'Genre',

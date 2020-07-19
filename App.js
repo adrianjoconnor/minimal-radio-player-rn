@@ -96,19 +96,19 @@ class App extends React.Component {
         },
       );
       that.state.states = that.stationExplorer.getStates();
-      that.state.stateItems = that.state.states.map((language, curLanguage) => {
+      that.state.stateItems = that.state.states.map((state, curState) => {
         return (
           <Picker.Item
             label={
-              language.name +
+              state.name +
               ', ' +
-              language.country +
+              state.country +
               ' (' +
-              language.stationcount +
+              state.stationcount +
               ')'
             }
-            value={curLanguage}
-            key={language.name}
+            value={curState}
+            key={state.name}
           />
         );
       });
@@ -177,6 +177,7 @@ class App extends React.Component {
       artwork: newStation.artwork,
     });
     TrackPlayer.play();
+    await AsyncStorage.setItem('selStation', stationIndex.toString());
   }
 
   showStationsForAdd(category, param) {
@@ -384,6 +385,21 @@ class App extends React.Component {
             style={{width: 400, height: 400}}
           />
           <Button
+            title="Add Station"
+            accessibilityLabel="Add a station."
+            onPress={() => {
+              this.setState({
+                addStationVisible: true,
+                advancedAddStationVisible: false,
+                newTitle: 'Title',
+                newUrl: 'Url',
+                newGenre: 'Genre',
+                newArtwork: 'Artwork Url',
+                directorySearchTerms: '',
+              });
+            }}
+          />
+          <Button
             title="Edit Stations"
             accessibilityLabel="Edit or delete stations."
             onPress={() => {
@@ -416,11 +432,11 @@ class App extends React.Component {
               {this.state.stateItems}
             </Picker>
             <Picker
-              selectedValue={this.state.selectedLanguageAdd}
+              selectedValue={this.state.selectedTagAdd}
               onValueChange={value =>
-                this.showStationsForAdd(Categories.LANGUAGE, value)
+                this.showStationsForAdd(Categories.TAG, value)
               }>
-              {this.state.languageItems}
+              {this.state.tagItems}
             </Picker>
             <Text>Search:</Text>
             <TextInput
@@ -631,21 +647,6 @@ class App extends React.Component {
               />
             </View>
           </ReactNativeModal>
-
-          <Button
-            title="Add Station"
-            accessibilityLabel="Add a station."
-            onPress={() => {
-              this.setState({
-                addStationVisible: true,
-                advancedAddStationVisible: false,
-                newTitle: 'Title',
-                newUrl: 'Url',
-                newGenre: 'Genre',
-                newArtwork: 'Artwork Url',
-              });
-            }}
-          />
         </SafeAreaView>
       </>
     );

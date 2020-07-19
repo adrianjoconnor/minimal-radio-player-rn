@@ -113,14 +113,15 @@ class StationExplorer {
     return this.states;
   }
 
-  async getStationsByStateInCountry(country, state) {
-    let response = await fetch(host + '/json/stations/search\n' + country, {
-      body: {
-        country: country,
-        state: state,
-      },
-      method: 'POST',
-    });
+  async getStationsByStateInCountry(state, country) {
+    let response = await fetch(
+      host +
+        '/json/stations/search?country=' +
+        country +
+        '&countryExact=true&state=' +
+        state +
+        '&stateExact=true',
+    );
     if (response.status === 200) {
       return response.json();
     } else {

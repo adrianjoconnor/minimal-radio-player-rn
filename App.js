@@ -138,15 +138,16 @@ class App extends React.Component {
         title: startStation.title,
         genre: startStation.genre,
         artwork: startStation.artwork,
+        artist: 'Now Playing',
       });
     };
     start();
   }
 
   async componentDidMount() {
-    AsyncStorage.getItem('stations').then(async stations => {
+    await AsyncStorage.getItem('stations').then(async stations => {
       if (stations === null) {
-        await AsyncStorage.setItem('stations', JSON.stringify(DefaultStations));
+        AsyncStorage.setItem('stations', JSON.stringify(DefaultStations));
       } else {
         this.setState({stations: JSON.parse(stations)});
       }
@@ -157,15 +158,19 @@ class App extends React.Component {
         await AsyncStorage.setItem('selStation', '0');
       } else {
         this.setState({selectedStation: Number.parseInt(selectedStation)});
+        this.changeStation(Number.parseInt(selectedStation), false);
       }
     });
   }
 
   async changeStation(stationIndex) {
+    return this.changeStation(stationIndex, true);
+  }
+
+  async changeStation(stationIndex, startPlaying) {
     let newStation = this.state.stations[stationIndex];
     this.setState({
       selectedStation: stationIndex,
-      playPressed: true,
     });
     await TrackPlayer.stop();
     await TrackPlayer.reset();
@@ -175,8 +180,16 @@ class App extends React.Component {
       title: newStation.title,
       genre: newStation.genre,
       artwork: newStation.artwork,
+      artist: 'Now Playing',
     });
-    TrackPlayer.play();
+    if (startPlaying) {
+      TrackPlayer.play().catch(
+          er => console.log(JSON.stringify(er))
+      );
+      this.setState({
+        playPressed: true,
+      })
+    }
     await AsyncStorage.setItem('selStation', stationIndex.toString());
   }
 
@@ -364,12 +377,12 @@ class App extends React.Component {
         <SafeAreaView style={styles}>
           <Button
             onPress={() => {
-              this.setState({playPressed: !this.state.playPressed});
               if (this.state.playPressed) {
                 TrackPlayer.stop();
               } else {
                 TrackPlayer.play();
               }
+              this.setState({playPressed: !this.state.playPressed});
             }}
             title={this.state.playPressed ? 'Stop' : 'Play'}
             color="black"
@@ -382,7 +395,7 @@ class App extends React.Component {
           </Picker>
           <Image
             source={{uri: selectedStation.artwork}}
-            style={{width: 400, height: 400}}
+            style={{width: 300, height: 300}}
           />
           <Button
             title="Add Station"
